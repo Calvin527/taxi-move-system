@@ -1,0 +1,40 @@
+from django.urls import path
+from rest_framework_simplejwt.views import (
+    TokenBlacklistView,
+    TokenObtainPairView,
+    TokenRefreshView,
+)
+
+from .views import (
+    CurrentUserProfileView,
+    PassengerRegistrationView,
+)
+
+
+urlpatterns = [
+    path(
+        "register/",
+        PassengerRegistrationView.as_view(),
+        name="passenger-register",
+    ),
+    path(
+        "login/",
+        TokenObtainPairView.as_view(),
+        name="token-obtain-pair",
+    ),
+    path(
+        "token/refresh/",
+        TokenRefreshView.as_view(),
+        name="token-refresh",
+    ),
+    path(
+        "logout/",
+        TokenBlacklistView.as_view(),
+        name="token-blacklist",
+    ),
+    path(
+        "me/",
+        CurrentUserProfileView.as_view(),
+        name="current-user-profile",
+    ),
+]
