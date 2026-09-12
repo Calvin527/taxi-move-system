@@ -419,3 +419,113 @@ class DispatchAssignmentViewSet(
         return Response(
             DispatchAssignmentSerializer(assignment).data
         )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="en-route",
+        permission_classes=[IsDriver],
+    )
+    def mark_en_route(self, request, pk=None):
+        with transaction.atomic():
+            assignment = (
+                DispatchAssignment.objects.select_for_update()
+                .filter(
+                    pk=pk,
+                    driver=request.user,
+                )
+                .first()
+            )
+
+            if assignment is None:
+                return Response(
+                    {"detail": "Dispatch assignment not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if assignment.status != DispatchAssignment.Status.ACCEPTED:
+                return Response(
+                    {
+                        "detail": (
+                            "Only accepted assignments can be marked as en route."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            assignment.status = DispatchAssignment.Status.EN_ROUTE
+            assignment.save(update_fields=["status"])
+
+        return Response(DispatchAssignmentSerializer(assignment).data)
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsDriver],
+    )
+    def arrived(self, request, pk=None):
+        with transaction.atomic():
+            assignment = (
+                DispatchAssignment.objects.select_for_update()
+                .filter(
+                    pk=pk,
+                    driver=request.user,
+                )
+                .first()
+            )
+
+            if assignment is None:
+                return Response(
+                    {"detail": "Dispatch assignment not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if assignment.status != DispatchAssignment.Status.EN_ROUTE:
+                return Response(
+                    {
+                        "detail": (
+                            "Only en route assignments can be marked as arrived."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            assignment.status = DispatchAssignment.Status.ARRIVED
+            assignment.save(update_fields=["status"])
+
+        return Response(DispatchAssignmentSerializer(assignment).data)
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsDriver],
+    )
+    def completed(self, request, pk=None):
+        with transaction.atomic():
+            assignment = (
+                DispatchAssignment.objects.select_for_update()
+                .filter(
+                    pk=pk,
+                    driver=request.user,
+                )
+                .first()
+            )
+
+            if assignment is None:
+                return Response(
+                    {"detail": "Dispatch assignment not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if assignment.status != DispatchAssignment.Status.ARRIVED:
+                return Response(
+                    {
+                        "detail": (
+                            "Only arrived assignments can be marked as completed."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            assignment.status = DispatchAssignment.Status.COMPLETED
+            assignment.save(update_fields=["status"])
+
+        return Response(DispatchAssignmentSerializer(assignment).data)
+

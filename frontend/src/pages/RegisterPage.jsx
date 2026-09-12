@@ -1,8 +1,8 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
-
 
 const initialForm = {
   username: "",
@@ -14,6 +14,34 @@ const initialForm = {
   password_confirm: "",
 };
 
+function getErrorMessage(requestError) {
+  const data = requestError.response?.data;
+
+  if (!data) {
+    return "Registration failed. Please check if the backend server is running.";
+  }
+
+  if (typeof data === "string") {
+    return data;
+  }
+
+  if (data.detail) {
+    return String(data.detail);
+  }
+
+  if (typeof data === "object") {
+    const firstField = Object.keys(data)[0];
+    const firstValue = data[firstField];
+
+    if (Array.isArray(firstValue)) {
+      return `${firstField}: ${firstValue[0]}`;
+    }
+
+    return `${firstField}: ${String(firstValue)}`;
+  }
+
+  return "Registration failed. Please try again.";
+}
 
 export default function RegisterPage() {
   const [form, setForm] = useState(initialForm);
@@ -23,7 +51,6 @@ export default function RegisterPage() {
   const { registerPassenger } = useAuth();
   const navigate = useNavigate();
 
-
   const handleChange = (event) => {
     setForm({
       ...form,
@@ -31,33 +58,42 @@ export default function RegisterPage() {
     });
   };
 
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+
+    if (form.password !== form.password_confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setSubmitting(true);
 
+    const payload = {
+      username: form.username.trim(),
+      first_name: form.first_name.trim(),
+      last_name: form.last_name.trim(),
+      email: form.email.trim(),
+      phone_number: form.phone_number.trim(),
+      password: form.password,
+      password_confirm: form.password_confirm,
+    };
+
     try {
-      await registerPassenger(form);
+      await registerPassenger(payload);
+
       navigate("/login", {
         state: {
           message: "Registration successful. Please log in.",
         },
       });
     } catch (requestError) {
-      const data = requestError.response?.data;
-
-      if (data) {
-        const firstError = Object.values(data).flat()[0];
-        setError(String(firstError));
-      } else {
-        setError("Registration failed. Please try again.");
-      }
+      console.error("Registration error:", requestError.response?.data || requestError);
+      setError(getErrorMessage(requestError));
     } finally {
       setSubmitting(false);
     }
   };
-
 
   return (
     <div className="auth-page">
@@ -72,6 +108,7 @@ export default function RegisterPage() {
           placeholder="Username"
           value={form.username}
           onChange={handleChange}
+          autoComplete="username"
           required
         />
 
@@ -81,6 +118,7 @@ export default function RegisterPage() {
             placeholder="First name"
             value={form.first_name}
             onChange={handleChange}
+            autoComplete="given-name"
             required
           />
 
@@ -89,6 +127,7 @@ export default function RegisterPage() {
             placeholder="Last name"
             value={form.last_name}
             onChange={handleChange}
+            autoComplete="family-name"
             required
           />
         </div>
@@ -99,6 +138,7 @@ export default function RegisterPage() {
           placeholder="Email address"
           value={form.email}
           onChange={handleChange}
+          autoComplete="email"
           required
         />
 
@@ -107,6 +147,7 @@ export default function RegisterPage() {
           placeholder="Phone number"
           value={form.phone_number}
           onChange={handleChange}
+          autoComplete="tel"
           required
         />
 
@@ -116,6 +157,7 @@ export default function RegisterPage() {
           placeholder="Password"
           value={form.password}
           onChange={handleChange}
+          autoComplete="new-password"
           required
         />
 
@@ -125,6 +167,7 @@ export default function RegisterPage() {
           placeholder="Confirm password"
           value={form.password_confirm}
           onChange={handleChange}
+          autoComplete="new-password"
           required
         />
 

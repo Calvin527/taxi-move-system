@@ -205,11 +205,16 @@ export default function DispatchPage() {
         `/transport/dispatches/${assignmentId}/${response}/`
       );
 
-      setMessage(
-        response === "accept"
-          ? "Dispatch accepted."
-          : "Dispatch rejected."
-      );
+      
+      const responseMessages = {
+  accept: "Dispatch accepted.",
+  reject: "Dispatch rejected.",
+  "en-route": "Driver is now en route.",
+  arrived: "Driver has arrived at the waiting spot.",
+  completed: "Dispatch completed successfully.",
+};
+
+      setMessage(responseMessages[response] || "Dispatch updated successfully.");
 
       await loadData(true);
     } catch (requestError) {
@@ -476,6 +481,47 @@ export default function DispatchPage() {
                   </button>
                 </div>
               )}
+              {isDriver && assignment.status === "ACCEPTED" && (
+  <div className="dispatch-actions">
+    <button
+      className="action-button"
+      type="button"
+      onClick={() =>
+        respondToDispatch(assignment.id, "en-route")
+      }
+    >
+      Mark en route
+    </button>
+  </div>
+)}
+
+{isDriver && assignment.status === "EN_ROUTE" && (
+  <div className="dispatch-actions">
+    <button
+      className="action-button"
+      type="button"
+      onClick={() =>
+        respondToDispatch(assignment.id, "arrived")
+      }
+    >
+      Mark arrived
+    </button>
+  </div>
+)}
+
+{isDriver && assignment.status === "ARRIVED" && (
+  <div className="dispatch-actions">
+    <button
+      className="action-button"
+      type="button"
+      onClick={() =>
+        respondToDispatch(assignment.id, "completed")
+      }
+    >
+      Mark completed
+    </button>
+  </div>
+)}
           </article>
         ))}
       </section>
