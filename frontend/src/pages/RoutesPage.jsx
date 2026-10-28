@@ -1,60 +1,74 @@
 
 import {
-  Link,
-  useLocation,
-} from "react-router-dom";
-import {
   useCallback,
   useEffect,
-  useMemo,
-  useRef,
   useState,
 } from "react";
 
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import {
+  Link,
+  useLocation,
+} from "react-router-dom";
 
 import api from "../api/client";
 import AppLayout from "../components/AppLayout";
 import { useAuth } from "../context/AuthContext";
 
 
+// ============================================================
+// CONSTANTS
+// ============================================================
+
 const MAX_GROUP_SIZE = 15;
 
+const initialRouteForm = {
+  name: "",
+  origin: "",
+  destination: "",
+};
 
 
+// ============================================================
+// HELPERS
+// ============================================================
 
 function toList(data) {
   if (Array.isArray(data)) {
     return data;
   }
 
-  return Array.isArray(data?.results)
-    ? data.results
-    : [];
+  if (Array.isArray(data?.results)) {
+    return data.results;
+  }
+
+  return [];
 }
 
 
 function extractError(error, fallback) {
-  const data = error.response?.data;
+  const data = error?.response?.data;
 
   if (!data) {
-    return error.message || fallback;
+    return error?.message || fallback;
+  }
+
+  if (typeof data === "string") {
+    return data;
   }
 
   if (data.detail) {
     return String(data.detail);
   }
 
-  const value = Object.values(data).flat()[0];
+  if (typeof data === "object") {
+    const firstValue = Object.values(data).flat()[0];
 
-  if (typeof value === "object" && value !== null) {
-    return String(
-      Object.values(value).flat()[0] || fallback
-    );
+    if (firstValue !== undefined) {
+      return String(firstValue);
+    }
   }
 
-  return String(value || fallback);
+  return fallback;
 }
 
 
@@ -63,9 +77,10 @@ function getBrowserLocation() {
     if (!navigator.geolocation) {
       reject(
         new Error(
-          "Location services are not supported by this browser."
+          "Your browser does not support GPS location."
         )
       );
+
       return;
     }
 
@@ -82,272 +97,12 @@ function getBrowserLocation() {
 }
 
 
-function validCoordinates(latitude, longitude) {
-  if (
-    latitude === ""
-    || longitude === ""
-    || latitude == null
-    || longitude == null
-  ) {
-    return null;
-  }
-
-  const lat = Number(latitude);
-  const lng = Number(longitude);
-
-  if (
-    !Number.isFinite(lat)
-    || !Number.isFinite(lng)
-    || lat < -90
-    || lat > 90
-    || lng < -180
-    || lng > 180
-  ) {
-    return null;
-  }
-
-  return [lat, lng];
-}
-
-
 function passengerLabel(count) {
   const number = Number(count) || 0;
 
-  return `${number} ${number === 1 ? "passenger" : "passengers"}`;
-}
-
-
-// ============================================================
-// INTERACTIVE WAITING SPOT MAP PICKER
-// ============================================================
-
-function WaitingSpotMapPicker({
-  latitude,
-  longitude,
-  radius,
-  existingSpots,
-  onSelect,
-}) {
-  const containerRef = useRef(null);
-  const mapRef = useRef(null);
-
-  const selectedLayerRef = useRef(null);
-  const existingLayerRef = useRef(null);
-
-  const markerRef = useRef(null);
-  const circleRef = useRef(null);
-
-  const onSelectRef = useRef(onSelect);
-  const fittedRef = useRef(false);
-
-  onSelectRef.current = onSelect;
-
-  useEffect(() => {
-    if (!containerRef.current) {
-      return undefined;
-    }
-
-    const map = L.map(containerRef.current, {
-      zoomControl: true,
-      scrollWheelZoom: false,
-    }).setView([-28.5, 24.7], 5);
-
-    L.tileLayer(
-      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      {
-        maxZoom: 19,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">'
-          + "OpenStreetMap</a> contributors",
-      }
-    ).addTo(map);
-
-    const existingLayer = L.layerGroup().addTo(map);
-    const selectedLayer = L.layerGroup().addTo(map);
-
-    mapRef.current = map;
-    existingLayerRef.current = existingLayer;
-    selectedLayerRef.current = selectedLayer;
-
-    map.on("click", (event) => {
-      onSelectRef.current(
-        event.latlng.lat.toFixed(6),
-        event.latlng.lng.toFixed(6)
-      );
-    });
-
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(() => map.invalidateSize())
-        : null;
-
-    resizeObserver?.observe(containerRef.current);
-
-    const resizeTimer = window.setTimeout(
-      () => map.invalidateSize(),
-      100
-    );
-
-    return () => {
-      window.clearTimeout(resizeTimer);
-      resizeObserver?.disconnect();
-
-      map.remove();
-
-      mapRef.current = null;
-      existingLayerRef.current = null;
-      selectedLayerRef.current = null;
-
-      markerRef.current = null;
-      circleRef.current = null;
-      fittedRef.current = false;
-    };
-  }, []);
-
-
-  useEffect(() => {
-    const map = mapRef.current;
-    const layer = existingLayerRef.current;
-
-    if (!map || !layer) {
-      return;
-    }
-
-    layer.clearLayers();
-
-    const points = [];
-
-    existingSpots.forEach((spot) => {
-      const coordinates = validCoordinates(
-        spot.latitude,
-        spot.longitude
-      );
-
-      if (!coordinates) {
-        return;
-      }
-
-      points.push(coordinates);
-
-      const marker = L.circleMarker(coordinates, {
-        radius: 6,
-        color: "#976f16",
-        weight: 2,
-        fillColor: "#e5b344",
-        fillOpacity: 0.9,
-      }).addTo(layer);
-
-      const popup = document.createElement("div");
-      popup.textContent =
-        `${spot.name} — ${spot.route_name || ""}`;
-
-      marker.bindPopup(popup);
-    });
-
-    if (!fittedRef.current && points.length > 0) {
-      if (points.length === 1) {
-        map.setView(points[0], 14);
-      } else {
-        map.fitBounds(points, {
-          padding: [30, 30],
-          maxZoom: 14,
-        });
-      }
-
-      fittedRef.current = true;
-    }
-  }, [existingSpots]);
-
-
-  useEffect(() => {
-    const map = mapRef.current;
-    const layer = selectedLayerRef.current;
-
-    if (!map || !layer) {
-      return;
-    }
-
-    const coordinates = validCoordinates(
-      latitude,
-      longitude
-    );
-
-    if (!coordinates) {
-      layer.clearLayers();
-
-      markerRef.current = null;
-      circleRef.current = null;
-      return;
-    }
-
-    const geofenceRadius = Math.max(
-      20,
-      Math.min(1000, Number(radius) || 100)
-    );
-
-    if (!circleRef.current) {
-      circleRef.current = L.circle(coordinates, {
-        radius: geofenceRadius,
-        color: "#1c6da4",
-        weight: 2,
-        fillColor: "#318ac4",
-        fillOpacity: 0.16,
-      }).addTo(layer);
-    } else {
-      circleRef.current.setLatLng(coordinates);
-      circleRef.current.setRadius(geofenceRadius);
-    }
-
-    if (!markerRef.current) {
-      markerRef.current = L.marker(coordinates, {
-        draggable: true,
-      }).addTo(layer);
-
-      markerRef.current.on("dragend", () => {
-        const position = markerRef.current.getLatLng();
-
-        onSelectRef.current(
-          position.lat.toFixed(6),
-          position.lng.toFixed(6)
-        );
-      });
-    } else {
-      markerRef.current.setLatLng(coordinates);
-    }
-
-    map.panTo(coordinates);
-
-    if (map.getZoom() < 13) {
-      map.setZoom(13);
-    }
-  }, [latitude, longitude, radius]);
-
-
-  return (
-    <div>
-      <div
-        ref={containerRef}
-        role="region"
-        aria-label="Select taxi waiting spot location on map"
-        style={{
-          width: "100%",
-          height: "350px",
-          borderRadius: "12px",
-          overflow: "hidden",
-          border: "1px solid rgba(20, 40, 65, 0.15)",
-        }}
-      />
-
-      <p
-        className="empty-note"
-        style={{ marginTop: "10px" }}
-      >
-        Click the map to choose the collection point.
-        Drag the marker to adjust its position.
-        The blue circle shows the geofence.
-      </p>
-    </div>
-  );
+  return `${number} ${
+    number === 1 ? "passenger" : "passengers"
+  }`;
 }
 
 
@@ -357,36 +112,60 @@ function WaitingSpotMapPicker({
 
 export default function RoutesPage() {
   const { user } = useAuth();
+
   const location = useLocation();
 
+  // ----------------------------------------------------------
+  // USER ROLES
+  // ----------------------------------------------------------
+
+  const isPassenger = user?.role === "PASSENGER";
+
+  const isDispatcher = user?.role === "DISPATCHER";
+
+
+  // ----------------------------------------------------------
+  // ROUTES
+  // ----------------------------------------------------------
+
   const [routes, setRoutes] = useState([]);
-  const [currentWaiting, setCurrentWaiting] = useState(null);
+
+  const [routeForm, setRouteForm] = useState(
+    initialRouteForm
+  );
+
+  const [savingRoute, setSavingRoute] = useState(false);
+
+
+  // ----------------------------------------------------------
+  // PASSENGER WAITING REQUEST
+  // ----------------------------------------------------------
+
+  const [currentWaiting, setCurrentWaiting] =
+    useState(null);
 
   const [partySize, setPartySize] = useState(1);
 
-  const [loading, setLoading] = useState(true);
-  const [checkingSpotId, setCheckingSpotId] = useState(null);
+  const [checkingSpotId, setCheckingSpotId] =
+    useState(null);
 
-  const [savingRoute, setSavingRoute] = useState(false);
-  const [cancellingWaiting, setCancellingWaiting] = useState(false);
-  const [confirmingArrival, setConfirmingArrival] = useState(false);
+  const [cancellingWaiting, setCancellingWaiting] =
+    useState(false);
+
+  const [confirmingArrival, setConfirmingArrival] =
+    useState(false);
+
+
+  // ----------------------------------------------------------
+  // PAGE STATE
+  // ----------------------------------------------------------
+
+  const [loading, setLoading] = useState(true);
 
   const [error, setError] = useState("");
+
   const [message, setMessage] = useState(
     location.state?.notice || ""
-  );
-
-  const spotFormRef = useRef(null);
-
-  const isPassenger = user?.role === "PASSENGER";
-  const isDispatcher = user?.role === "DISPATCHER";
-
-  const existingSpots = useMemo(
-    () =>
-      routes.flatMap(
-        (route) => route.waiting_spots || []
-      ),
-    [routes]
   );
 
   const boardingCode =
@@ -394,13 +173,14 @@ export default function RoutesPage() {
 
 
   // ==========================================================
-  // LOAD DATA
+  // LOAD ROUTES AND WAITING SPOTS
   // ==========================================================
 
   const loadData = useCallback(
     async (silent = false) => {
       if (!silent) {
         setLoading(true);
+        setError("");
       }
 
       try {
@@ -412,27 +192,46 @@ export default function RoutesPage() {
           api.get("/transport/waiting-spots/"),
         ]);
 
-        const routeData = toList(routesResponse.data);
-        const spotData = toList(spotsResponse.data);
+        const routeData = toList(
+          routesResponse.data
+        );
 
-        const mergedRoutes = routeData.map((route) => ({
-          ...route,
-          waiting_spots: spotData.filter(
-            (spot) =>
-              Number(spot.route) === Number(route.id)
-          ),
-        }));
+        const spotData = toList(
+          spotsResponse.data
+        );
+
+        // Attach waiting spots to their routes.
+        const mergedRoutes = routeData.map(
+          (route) => ({
+            ...route,
+
+            waiting_spots: spotData
+              .filter(
+                (spot) =>
+                  Number(spot.route) ===
+                  Number(route.id)
+              )
+              .sort(
+                (a, b) =>
+                  Number(a.stop_order ?? 0) -
+                  Number(b.stop_order ?? 0)
+              ),
+          })
+        );
 
         setRoutes(mergedRoutes);
 
+        // Only passengers have a current waiting request.
         if (isPassenger) {
           const waitingResponse = await api.get(
             "/transport/waiting-requests/current/"
           );
 
+          const waitingData = waitingResponse.data;
+
           setCurrentWaiting(
-            waitingResponse.data.active
-              ? waitingResponse.data.request
+            waitingData.active
+              ? waitingData.request
               : null
           );
         } else {
@@ -443,7 +242,7 @@ export default function RoutesPage() {
           setError(
             extractError(
               requestError,
-              "TaxiLink data could not be loaded."
+              "TAXI MOVE data could not be loaded."
             )
           );
         }
@@ -457,6 +256,10 @@ export default function RoutesPage() {
   );
 
 
+  // ==========================================================
+  // AUTO REFRESH
+  // ==========================================================
+
   useEffect(() => {
     loadData();
 
@@ -465,7 +268,9 @@ export default function RoutesPage() {
       10000
     );
 
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+    };
   }, [loadData]);
 
 
@@ -474,15 +279,25 @@ export default function RoutesPage() {
   // ==========================================================
 
   const handleRouteChange = (event) => {
+    const { name, value } = event.target;
+
     setRouteForm((current) => ({
       ...current,
-      [event.target.name]: event.target.value,
+      [name]: value,
     }));
   };
 
 
+  // ==========================================================
+  // CREATE ROUTE
+  // ==========================================================
+
   const createRoute = async (event) => {
     event.preventDefault();
+
+    if (!isDispatcher) {
+      return;
+    }
 
     setError("");
     setMessage("");
@@ -491,11 +306,18 @@ export default function RoutesPage() {
     try {
       await api.post(
         "/transport/routes/",
-        routeForm
+        {
+          name: routeForm.name.trim(),
+          origin: routeForm.origin.trim(),
+          destination: routeForm.destination.trim(),
+        }
       );
 
       setRouteForm(initialRouteForm);
-      setMessage("Route created successfully.");
+
+      setMessage(
+        "Route created successfully."
+      );
 
       await loadData(true);
     } catch (requestError) {
@@ -512,169 +334,14 @@ export default function RoutesPage() {
 
 
   // ==========================================================
-  // WAITING SPOT FORM
-  // ==========================================================
-
-  const handleSpotChange = (event) => {
-    setSpotForm((current) => ({
-      ...current,
-      [event.target.name]: event.target.value,
-    }));
-  };
-
-
-  const selectMapLocation = useCallback(
-    (latitude, longitude) => {
-      setSpotForm((current) => ({
-        ...current,
-        latitude,
-        longitude,
-      }));
-    },
-    []
-  );
-
-
-  const useCurrentLocationForSpot = async () => {
-    setError("");
-    setMessage("");
-    setLocatingDispatcher(true);
-
-    try {
-      const position = await getBrowserLocation();
-
-      selectMapLocation(
-        position.coords.latitude.toFixed(6),
-        position.coords.longitude.toFixed(6)
-      );
-
-      setMessage(
-        "Your current location was selected on the map."
-      );
-    } catch (locationError) {
-      setError(
-        locationError.message
-        || "Your location could not be obtained."
-      );
-    } finally {
-      setLocatingDispatcher(false);
-    }
-  };
-
-
-  const saveWaitingSpot = async (event) => {
-    event.preventDefault();
-
-    setError("");
-    setMessage("");
-
-    if (!validCoordinates(
-      spotForm.latitude,
-      spotForm.longitude
-    )) {
-      setError(
-        "Please select a valid waiting spot on the map."
-      );
-      return;
-    }
-
-    const radius = Number(
-      spotForm.geofence_radius_meters
-    );
-
-    if (
-      !Number.isInteger(radius)
-      || radius < 20
-      || radius > 1000
-    ) {
-      setError(
-        "The geofence radius must be between "
-        + "20 and 1000 metres."
-      );
-      return;
-    }
-
-    const payload = {
-      route: Number(spotForm.route),
-      name: spotForm.name.trim(),
-      latitude: spotForm.latitude,
-      longitude: spotForm.longitude,
-      geofence_radius_meters: radius,
-    };
-
-    setSavingSpot(true);
-
-    try {
-      if (editingSpotId) {
-        await api.patch(
-          `/transport/waiting-spots/${editingSpotId}/`,
-          payload
-        );
-
-        setMessage(
-          "Waiting spot updated successfully."
-        );
-      } else {
-        await api.post(
-          "/transport/waiting-spots/",
-          payload
-        );
-
-        setMessage(
-          "Waiting spot created successfully."
-        );
-      }
-
-      setSpotForm(initialSpotForm);
-      setEditingSpotId(null);
-
-      await loadData(true);
-    } catch (requestError) {
-      setError(
-        extractError(
-          requestError,
-          "Waiting spot could not be saved."
-        )
-      );
-    } finally {
-      setSavingSpot(false);
-    }
-  };
-
-
-  const startEditingSpot = (spot) => {
-    setError("");
-    setMessage("");
-
-    setEditingSpotId(spot.id);
-
-    setSpotForm({
-      route: String(spot.route),
-      name: spot.name,
-      latitude: String(spot.latitude),
-      longitude: String(spot.longitude),
-      geofence_radius_meters:
-        spot.geofence_radius_meters,
-    });
-
-    spotFormRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
-
-
-  const cancelSpotEditing = () => {
-    setEditingSpotId(null);
-    setSpotForm(initialSpotForm);
-  };
-
-
-  // ==========================================================
-  // ROUTE AND WAITING SPOT STATUS
+  // ACTIVATE / DEACTIVATE ROUTE
   // ==========================================================
 
   const toggleRoute = async (route) => {
+    if (!isDispatcher) {
+      return;
+    }
+
     setError("");
     setMessage("");
 
@@ -688,8 +355,8 @@ export default function RoutesPage() {
 
       setMessage(
         route.is_active
-          ? "Route deactivated."
-          : "Route activated."
+          ? "Route deactivated successfully."
+          : "Route activated successfully."
       );
 
       await loadData(true);
@@ -697,14 +364,22 @@ export default function RoutesPage() {
       setError(
         extractError(
           requestError,
-          "Route status could not be changed."
+          "Route status could not be updated."
         )
       );
     }
   };
 
 
+  // ==========================================================
+  // ACTIVATE / DEACTIVATE WAITING SPOT
+  // ==========================================================
+
   const toggleWaitingSpot = async (spot) => {
+    if (!isDispatcher) {
+      return;
+    }
+
     setError("");
     setMessage("");
 
@@ -727,7 +402,7 @@ export default function RoutesPage() {
       setError(
         extractError(
           requestError,
-          "Waiting spot status could not be changed."
+          "Waiting spot status could not be updated."
         )
       );
     }
@@ -735,14 +410,19 @@ export default function RoutesPage() {
 
 
   // ==========================================================
-  // PASSENGER GROUP CHECK-IN
+  // PASSENGER CHECK-IN
   // ==========================================================
 
   const checkInAtSpot = async (spot) => {
+    if (!isPassenger) {
+      return;
+    }
+
     if (currentWaiting) {
       setError(
         "You already have an active waiting request or trip."
       );
+
       return;
     }
 
@@ -753,30 +433,36 @@ export default function RoutesPage() {
     const selectedPartySize = Number(partySize);
 
     if (
-      !Number.isInteger(selectedPartySize)
-      || selectedPartySize < 1
-      || selectedPartySize > MAX_GROUP_SIZE
+      !Number.isInteger(selectedPartySize) ||
+      selectedPartySize < 1 ||
+      selectedPartySize > MAX_GROUP_SIZE
     ) {
       setError(
         "Choose a group size between 1 and 15 passengers."
       );
+
       return;
     }
 
     setError("");
     setMessage("");
+
     setCheckingSpotId(spot.id);
 
     try {
+      // Request the passenger's current GPS location.
       const position = await getBrowserLocation();
 
       const response = await api.post(
         "/transport/waiting-requests/check-in/",
         {
           waiting_spot: spot.id,
+
           party_size: selectedPartySize,
+
           latitude:
             position.coords.latitude.toFixed(6),
+
           longitude:
             position.coords.longitude.toFixed(6),
         }
@@ -785,8 +471,8 @@ export default function RoutesPage() {
       setCurrentWaiting(response.data);
 
       setMessage(
-        `${passengerLabel(selectedPartySize)} checked in `
-        + `at ${spot.name}.`
+        `${passengerLabel(selectedPartySize)} checked in ` +
+        `at ${spot.name}.`
       );
 
       setPartySize(1);
@@ -810,8 +496,13 @@ export default function RoutesPage() {
   // ==========================================================
 
   const cancelWaitingRequest = async () => {
+    if (!isPassenger || !currentWaiting) {
+      return;
+    }
+
     setError("");
     setMessage("");
+
     setCancellingWaiting(true);
 
     try {
@@ -844,8 +535,13 @@ export default function RoutesPage() {
   // ==========================================================
 
   const confirmSafeArrival = async () => {
+    if (!isPassenger || !currentWaiting) {
+      return;
+    }
+
     setError("");
     setMessage("");
+
     setConfirmingArrival(true);
 
     try {
@@ -856,8 +552,7 @@ export default function RoutesPage() {
       setCurrentWaiting(null);
 
       setMessage(
-        "Safe arrival confirmed. "
-        + "The dispatcher has been notified."
+        "Safe arrival confirmed. The dispatcher has been notified."
       );
 
       await loadData(true);
@@ -875,19 +570,25 @@ export default function RoutesPage() {
 
 
   // ==========================================================
-  // PAGE
+  // PAGE INTERFACE
   // ==========================================================
 
   return (
     <AppLayout>
+
+      {/* PAGE HEADING */}
+
       <section className="page-heading">
         <h2>Routes and Waiting Spots</h2>
 
         <p>
-          Passenger service operates from
-          04:00 until 17:00.
+          TAXI MOVE passenger service operates
+          daily from 04:00 until 17:00.
         </p>
       </section>
+
+
+      {/* SUCCESS MESSAGE */}
 
       {message && (
         <div className="success-message">
@@ -895,19 +596,27 @@ export default function RoutesPage() {
         </div>
       )}
 
+
+      {/* ERROR MESSAGE */}
+
       {error && (
         <div className="error-message">
           {error}
         </div>
       )}
 
+
+      {/* ================================================ */}
       {/* CURRENT PASSENGER REQUEST */}
+      {/* ================================================ */}
 
       {isPassenger && currentWaiting && (
         <section className="current-waiting-card">
+
           <div>
             <span className="status-badge active">
-              {currentWaiting.status_display}
+              {currentWaiting.status_display ||
+                currentWaiting.status}
             </span>
 
             <h3>
@@ -927,11 +636,17 @@ export default function RoutesPage() {
               </strong>
             </p>
 
+
+            {/* ASSIGNED DRIVER */}
+
             {currentWaiting.driver_name && (
               <p>
                 Driver: {currentWaiting.driver_name}
               </p>
             )}
+
+
+            {/* DISPATCH STATUS */}
 
             {currentWaiting.dispatch_status_display && (
               <p>
@@ -940,9 +655,11 @@ export default function RoutesPage() {
               </p>
             )}
 
-            {boardingCode
-              && currentWaiting.status !== "BOARDED"
-              && (
+
+            {/* BOARDING CODE */}
+
+            {boardingCode &&
+              currentWaiting.status !== "BOARDED" && (
                 <div
                   style={{
                     padding: "16px",
@@ -980,6 +697,9 @@ export default function RoutesPage() {
                 </div>
               )}
 
+
+            {/* WAITING */}
+
             {currentWaiting.status === "WAITING" && (
               <small>
                 Location verified approximately{" "}
@@ -988,6 +708,9 @@ export default function RoutesPage() {
               </small>
             )}
 
+
+            {/* ASSIGNED */}
+
             {currentWaiting.status === "ASSIGNED" && (
               <small>
                 A taxi has been assigned to your group.
@@ -995,14 +718,19 @@ export default function RoutesPage() {
               </small>
             )}
 
-            {currentWaiting.status === "BOARDED"
-              && !currentWaiting.can_confirm_arrival
-              && (
+
+            {/* BOARDED */}
+
+            {currentWaiting.status === "BOARDED" &&
+              !currentWaiting.can_confirm_arrival && (
                 <small>
                   Your group has boarded.
                   The trip is in progress.
                 </small>
               )}
+
+
+            {/* READY FOR ARRIVAL CONFIRMATION */}
 
             {currentWaiting.can_confirm_arrival && (
               <small>
@@ -1011,6 +739,9 @@ export default function RoutesPage() {
               </small>
             )}
           </div>
+
+
+          {/* CANCEL BUTTON */}
 
           {["WAITING", "ASSIGNED"].includes(
             currentWaiting.status
@@ -1027,6 +758,9 @@ export default function RoutesPage() {
             </button>
           )}
 
+
+          {/* CONFIRM ARRIVAL BUTTON */}
+
           {currentWaiting.can_confirm_arrival && (
             <button
               className="action-button"
@@ -1039,18 +773,26 @@ export default function RoutesPage() {
                 : "I've Arrived Safely"}
             </button>
           )}
+
         </section>
       )}
 
+
+      {/* ================================================ */}
       {/* PASSENGER GROUP SIZE */}
+      {/* ================================================ */}
 
       {isPassenger && !currentWaiting && (
         <section
           className="current-waiting-card"
-          style={{ marginBottom: "24px" }}
+          style={{
+            marginBottom: "24px",
+          }}
         >
           <div>
-            <h3>How many passengers are waiting?</h3>
+            <h3>
+              How many passengers are waiting?
+            </h3>
 
             <p>
               Select the total number of people
@@ -1073,9 +815,11 @@ export default function RoutesPage() {
             <select
               id="passenger-party-size"
               value={partySize}
-              onChange={(event) =>
-                setPartySize(Number(event.target.value))
-              }
+              onChange={(event) => {
+                setPartySize(
+                  Number(event.target.value)
+                );
+              }}
               disabled={checkingSpotId !== null}
               style={{
                 width: "180px",
@@ -1090,13 +834,20 @@ export default function RoutesPage() {
                 { length: MAX_GROUP_SIZE },
                 (_, index) => index + 1
               ).map((count) => (
-                <option key={count} value={count}>
+                <option
+                  key={count}
+                  value={count}
+                >
                   {passengerLabel(count)}
                 </option>
               ))}
             </select>
 
-            <p style={{ marginTop: "10px" }}>
+            <p
+              style={{
+                marginTop: "10px",
+              }}
+            >
               Selected:{" "}
               <strong>
                 {passengerLabel(partySize)}
@@ -1106,57 +857,62 @@ export default function RoutesPage() {
         </section>
       )}
 
-      {/* DISPATCHER MANAGEMENT */}
 
-{isDispatcher && (
-  <section
-    className="form-card"
-    style={{
-      maxWidth: "650px",
-      marginBottom: "24px",
-    }}
-  >
-    <form onSubmit={createRoute}>
-      <h3>Create Route</h3>
+      {/* ================================================ */}
+      {/* DISPATCHER: CREATE ROUTE */}
+      {/* ================================================ */}
 
-      <input
-        name="name"
-        placeholder="Route name"
-        value={routeForm.name}
-        onChange={handleRouteChange}
-        required
-      />
+      {isDispatcher && (
+        <section
+          className="form-card"
+          style={{
+            maxWidth: "650px",
+            marginBottom: "24px",
+          }}
+        >
+          <form onSubmit={createRoute}>
+            <h3>Create Route</h3>
 
-      <input
-        name="origin"
-        placeholder="Origin"
-        value={routeForm.origin}
-        onChange={handleRouteChange}
-        required
-      />
+            <input
+              name="name"
+              placeholder="Route name"
+              value={routeForm.name}
+              onChange={handleRouteChange}
+              required
+            />
 
-      <input
-        name="destination"
-        placeholder="Destination"
-        value={routeForm.destination}
-        onChange={handleRouteChange}
-        required
-      />
+            <input
+              name="origin"
+              placeholder="Origin"
+              value={routeForm.origin}
+              onChange={handleRouteChange}
+              required
+            />
 
-      <button
-        type="submit"
-        disabled={savingRoute}
-      >
-        {savingRoute
-          ? "Creating..."
-          : "Create Route"}
-      </button>
-    </form>
-  </section>
-)}
-      
+            <input
+              name="destination"
+              placeholder="Destination"
+              value={routeForm.destination}
+              onChange={handleRouteChange}
+              required
+            />
 
+            <button
+              type="submit"
+              disabled={savingRoute}
+            >
+              {savingRoute
+                ? "Creating..."
+                : "Create Route"}
+            </button>
+          </form>
+        </section>
+      )}
+
+
+      {/* ================================================ */}
       {/* ROUTES AND WAITING SPOTS */}
+      {/* ================================================ */}
 
       {loading ? (
         <div className="page-message">
@@ -1164,20 +920,31 @@ export default function RoutesPage() {
         </div>
       ) : (
         <section className="list-stack">
+
+          {/* EMPTY ROUTES */}
+
           {routes.length === 0 && (
             <div className="route-card">
-              No active routes are available.
+              No routes are currently available.
             </div>
           )}
+
+
+          {/* ROUTE CARDS */}
 
           {routes.map((route) => (
             <article
               className="route-card"
               key={route.id}
             >
+
+              {/* ROUTE HEADER */}
+
               <div className="route-header">
                 <div>
-                  <h3>{route.name}</h3>
+                  <h3>
+                    {route.name}
+                  </h3>
 
                   <p>
                     {route.origin} → {route.destination}
@@ -1201,11 +968,16 @@ export default function RoutesPage() {
                       : "Service unavailable"}
                   </span>
 
+
+                  {/* ACTIVATE / DEACTIVATE ROUTE */}
+
                   {isDispatcher && (
                     <button
                       className="secondary-button"
                       type="button"
-                      onClick={() => toggleRoute(route)}
+                      onClick={() => {
+                        toggleRoute(route);
+                      }}
                     >
                       {route.is_active
                         ? "Deactivate"
@@ -1214,80 +986,104 @@ export default function RoutesPage() {
                   )}
                 </div>
               </div>
+
+
+              {/* ======================================== */}
+              {/* ADD WAITING SPOT */}
+              {/* ======================================== */}
+
               {isDispatcher && (
-  <div
-    style={{
-      display: "flex",
-      gap: "12px",
-      marginBottom: "20px",
-      flexWrap: "wrap",
-    }}
-  >
-    <Link
-      to={
-        "/routes/" +
-        route.id +
-        "/waiting-spots/new"
-      }
-      className="action-button"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        textDecoration: "none",
-      }}
-    >
-      + Add Waiting Spot
-    </Link>
-  </div>
-)}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "12px",
+                    marginBottom: "20px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <Link
+                    to={
+                      `/routes/${route.id}/waiting-spots/new`
+                    }
+                    className="action-button"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      textDecoration: "none",
+                    }}
+                  >
+                    + Add Waiting Spot
+                  </Link>
+                </div>
+              )}
+
+
+              {/* ======================================== */}
+              {/* WAITING SPOTS FOR THIS ROUTE */}
+              {/* ======================================== */}
 
               <div className="spot-list">
+
                 {route.waiting_spots.length === 0 && (
                   <p>
-                    No waiting spots are currently
-                    available for this route.
+                    No waiting spots have been added
+                    to this route.
                   </p>
                 )}
 
-                {route.waiting_spots.map((spot) => {
-                  const waitingHere = (
-                    Number(currentWaiting?.waiting_spot)
-                    === Number(spot.id)
-                  );
 
-                  const serviceOpen = (
-                    route.service_is_open
-                    && spot.service_is_open
-                  );
+                {route.waiting_spots.map((spot) => {
+                  const waitingHere =
+                    Number(
+                      currentWaiting?.waiting_spot
+                    ) === Number(spot.id);
+
+                  const serviceOpen =
+                    Boolean(route.service_is_open) &&
+                    Boolean(spot.service_is_open);
 
                   return (
                     <div
                       className="spot-item"
                       key={spot.id}
                     >
+
+                      {/* SPOT INFORMATION */}
+
                       <div>
                         <strong>
                           {spot.name}
                         </strong>
 
                         <p>
-                          {spot.latitude}, {spot.longitude}
+                          {spot.latitude},{" "}
+                          {spot.longitude}
                         </p>
 
                         <small>
                           Geofence radius:{" "}
-                          {spot.geofence_radius_meters} metres
+                          {spot.geofence_radius_meters}{" "}
+                          metres
                         </small>
                       </div>
 
+
+                      {/* SPOT ACTIONS */}
+
                       <div className="spot-actions">
+
+                        {/* PASSENGER DEMAND */}
+
                         <span className="waiting-count">
                           {passengerLabel(
                             spot.active_waiting_count
                           )}{" "}
                           waiting
                         </span>
+
+
+                        {/* SPOT STATUS */}
 
                         <span
                           className={
@@ -1301,71 +1097,85 @@ export default function RoutesPage() {
                             : "Unavailable"}
                         </span>
 
-                        {isPassenger && !serviceOpen && (
-                          <small>
-                            Check-in unavailable
-                            from 17:00 until 04:00.
-                          </small>
-                        )}
 
-                        {isPassenger
-                          && serviceOpen
-                          && !currentWaiting
-                          && (
+                        {/* CLOSED SERVICE MESSAGE */}
+
+                        {isPassenger &&
+                          !serviceOpen && (
+                            <small>
+                              Check-in is unavailable
+                              while this service is closed.
+                            </small>
+                          )}
+
+
+                        {/* PASSENGER CHECK-IN */}
+
+                        {isPassenger &&
+                          serviceOpen &&
+                          !currentWaiting && (
                             <button
                               className="action-button"
                               type="button"
                               disabled={
                                 checkingSpotId !== null
                               }
-                              onClick={() =>
-                                checkInAtSpot(spot)
-                              }
+                              onClick={() => {
+                                checkInAtSpot(spot);
+                              }}
                             >
                               {checkingSpotId === spot.id
                                 ? "Checking location..."
-                                : `I'm Waiting (${passengerLabel(partySize)})`}
+                                : `I'm Waiting (${passengerLabel(
+                                    partySize
+                                  )})`}
                             </button>
                           )}
 
-                        {isPassenger
-                          && serviceOpen
-                          && currentWaiting
-                          && (
+
+                        {/* EXISTING PASSENGER TRIP */}
+
+                        {isPassenger &&
+                          currentWaiting && (
                             <span className="status-badge inactive">
                               {waitingHere
-                                ? currentWaiting.status_display
+                                ? currentWaiting.status_display ||
+                                  currentWaiting.status
                                 : "Active trip"}
                             </span>
                           )}
 
+
+                        {/* DISPATCHER CONTROLS */}
+
                         {isDispatcher && (
                           <>
+                            {/* EDIT WAITING SPOT */}
+
                             <Link
-  to={
-    "/routes/" +
-    route.id +
-    "/waiting-spots/" +
-    spot.id +
-    "/edit"
-  }
-  className="secondary-button"
-  style={{
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    textDecoration: "none",
-  }}
->
-  Edit
-</Link>
+                              to={
+                                `/routes/${route.id}/waiting-spots/${spot.id}/edit`
+                              }
+                              className="secondary-button"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                textDecoration: "none",
+                              }}
+                            >
+                              Edit
+                            </Link>
+
+
+                            {/* ACTIVATE / DEACTIVATE */}
 
                             <button
                               className="secondary-button"
                               type="button"
-                              onClick={() =>
-                                toggleWaitingSpot(spot)
-                              }
+                              onClick={() => {
+                                toggleWaitingSpot(spot);
+                              }}
                             >
                               {spot.is_active
                                 ? "Deactivate"
@@ -1373,15 +1183,19 @@ export default function RoutesPage() {
                             </button>
                           </>
                         )}
+
                       </div>
                     </div>
                   );
                 })}
               </div>
+
             </article>
           ))}
+
         </section>
       )}
+
     </AppLayout>
   );
 }
