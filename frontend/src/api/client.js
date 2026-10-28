@@ -1,37 +1,83 @@
+
 import axios from "axios";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+
+// ============================================================
+// API BASE URL
+// ============================================================
+
+const configuredBaseURL = import.meta.env.VITE_API_BASE_URL;
+
+const baseURL = (
+  configuredBaseURL ||
+  (import.meta.env.DEV
+    ? "http://127.0.0.1:8000/api"
+    : "")
+).replace(/\/+$/, "");
+
+if (!baseURL) {
+  throw new Error(
+    "VITE_API_BASE_URL must be configured for TAXI MOVE."
+  );
+}
+
+
+// ============================================================
+// AXIOS INSTANCE
+// ============================================================
 
 const api = axios.create({
   baseURL,
+
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-api.interceptors.request.use((config) => {
-  const accessToken = localStorage.getItem("access_token");
 
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
-  }
+// ============================================================
+// REQUEST INTERCEPTOR
+// ============================================================
 
-  return config;
-});
+api.interceptors.request.use(
+  (config) => {
+    const accessToken = localStorage.getItem("access_token");
+
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return config;
+  },
+
+  (error) => Promise.reject(error)
+);
+
+
+// ============================================================
+// RESPONSE INTERCEPTOR
+// ============================================================
 
 api.interceptors.response.use(
   (response) => response,
 
   async (error) => {
     const originalRequest = error.config;
+
+    if (!originalRequest) {
+      return Promise.reject(error);
+    }
+
     const refreshToken = localStorage.getItem("refresh_token");
+
+    const requestURL = originalRequest.url || "";
 
     const shouldRefresh =
       error.response?.status === 401 &&
-      refreshToken &&
+      Boolean(refreshToken) &&
       !originalRequest._retry &&
-      !originalRequest.url.includes("/accounts/login/") &&
-      !originalRequest.url.includes("/accounts/token/refresh/");
+      !requestURL.includes("accounts/login/") &&
+      !requestURL.includes("accounts/token/refresh/");
 
     if (!shouldRefresh) {
       return Promise.reject(error);
@@ -42,15 +88,30 @@ api.interceptors.response.use(
     try {
       const response = await axios.post(
         `${baseURL}/accounts/token/refresh/`,
-        { refresh: refreshToken }
+        {
+          refresh: refreshToken,
+        }
       );
 
       const newAccessToken = response.data.access;
 
-      localStorage.setItem("access_token", newAccessToken);
-      originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+      if (!newAccessToken) {
+        throw new Error("No access token returned.");
+      }
+
+      localStorage.setItem(
+        "access_token",
+        newAccessToken
+      );
+
+      originalRequest.headers =
+        originalRequest.headers || {};
+
+      originalRequest.headers.Authorization =
+        `Bearer ${newAccessToken}`;
 
       return api(originalRequest);
+
     } catch (refreshError) {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
@@ -61,5 +122,6 @@ api.interceptors.response.use(
     }
   }
 );
+
 
 export default api;

@@ -1,0 +1,95 @@
+/* ==========================================================
+   TAXILINK — DISPATCH PASSENGER GROUPS
+========================================================== */
+
+.dispatch-group-summary {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--border, #d9e0e7);
+  border-radius: 12px;
+  background: var(--off-white, #f7f8fa);
+}
+
+.dispatch-group-summary h5,
+.dispatch-boarding-panel h5 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: var(--navy, #153b56);
+}
+
+.dispatch-group-summary p {
+  margin: 0 0 12px;
+}
+
+.dispatch-group-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dispatch-group-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border, #d9e0e7);
+}
+
+/* ==========================================================
+   DRIVER BOARDING VERIFICATION PANEL
+========================================================== */
+
+.dispatch-boarding-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--gold-light, #c38a3a);
+  border-radius: 12px;
+  background: var(--white, #ffffff);
+}
+
+.dispatch-boarding-panel form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.dispatch-boarding-panel form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 210px;
+  max-width: 280px;
+}
+
+.dispatch-boarding-panel form input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #d9e0e7);
+  border-radius: 8px;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+}
+
+.dispatch-boarding-panel .dispatch-actions {
+  margin-top: 14px;
+}
+
+/* ==========================================================
+   MOBILE RESPONSIVENESS
+========================================================== */
+
+@media (max-width: 600px) {
+  .dispatch-group-list li {
+    align-items: flex-start;
+  }
+
+  .dispatch-boarding-panel form label,
+  .dispatch-boarding-panel form button {
+    max-width: none;
+    width: 100%;
+  }
+}

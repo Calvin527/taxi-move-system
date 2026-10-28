@@ -17,3 +17,9 @@ frontend/.env
 __MACOSX/
 .vscode/
 .idea/
+# Additional environment files
+.env.*
+!.env.example
+
+# Collected Django static files
+backend/staticfiles/

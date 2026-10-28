@@ -1,4 +1,8 @@
-import { NavLink, useNavigate } from "react-router-dom";
+
+import {
+  NavLink,
+  useNavigate,
+} from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 
@@ -7,36 +11,72 @@ export default function AppLayout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
 
+  const navClass = ({ isActive }) =>
+    isActive
+      ? "nav-link active"
+      : "nav-link";
 
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <h1>TaxiLink</h1>
-          <small>
-            Smart Taxi Demand Monitoring and Dispatch
-          </small>
+        <div className="brand-block">
+          <div className="brand-mark">
+            TM
+          </div>
+
+          <div>
+            <h1>
+              TAXI MOVE
+            </h1>
+
+            <small>
+              Smart Taxi Dispatch & Passenger Management
+            </small>
+          </div>
         </div>
 
-        <nav>
-          <NavLink to="/dashboard">Dashboard</NavLink>
-          <NavLink to="/routes">Routes</NavLink>
-          <NavLink to="/profile">Profile</NavLink>
-        {["DRIVER", "DISPATCHER"].includes(user.role) && (
-  <NavLink to="/dispatch">
-    Dispatch
-  </NavLink>
-)}
+        <nav className="main-navigation">
+          <NavLink
+            className={navClass}
+            to="/dashboard"
+          >
+            Dashboard
+          </NavLink>
+
+          <NavLink
+            className={navClass}
+            to="/routes"
+          >
+            Routes
+          </NavLink>
+
+          {["DRIVER", "DISPATCHER"].includes(
+            user?.role
+          ) && (
+            <NavLink
+              className={navClass}
+              to="/dispatch"
+            >
+              Dispatch
+            </NavLink>
+          )}
+
+          <NavLink
+            className={navClass}
+            to="/profile"
+          >
+            Profile
+          </NavLink>
+
           <button
-            className="link-button"
-            onClick={handleLogout}
+            className="logout-button"
             type="button"
+            onClick={handleLogout}
           >
             Logout
           </button>
@@ -45,9 +85,25 @@ export default function AppLayout({ children }) {
 
       <main className="page-container">
         <div className="user-summary">
-          Signed in as <strong>{user.username}</strong>
-          {" · "}
-          {user.role_display}
+          <div className="user-avatar">
+            {user?.username
+              ?.charAt(0)
+              .toUpperCase()}
+          </div>
+
+          <div>
+            <span className="user-summary-label">
+              Signed in as
+            </span>
+
+            <strong>
+              {user?.username}
+            </strong>
+          </div>
+
+          <span className="role-badge">
+            {user?.role_display}
+          </span>
         </div>
 
         {children}

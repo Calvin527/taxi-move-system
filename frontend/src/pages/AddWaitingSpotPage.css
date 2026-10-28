@@ -1,0 +1,116 @@
+/* ============================================================
+   ADD / EDIT WAITING SPOT PAGE
+============================================================ */
+
+.spot-editor-shell {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.spot-editor-card {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.spot-back-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  margin-bottom: 12px;
+}
+
+/* SELECTED ROUTE */
+
+.selected-route-info {
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  background: #eef4f8;
+  border-left: 4px solid var(--navy, #153b56);
+  border-radius: 8px;
+}
+
+.selected-route-info span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--gold, #9a611b);
+}
+
+.selected-route-info h3 {
+  margin: 0 0 8px;
+  color: var(--navy, #153b56);
+}
+
+.selected-route-info p {
+  margin: 0;
+  color: var(--text-muted, #64748b);
+}
+
+/* INTERACTIVE MAP */
+
+.waiting-spot-map {
+  width: 100%;
+  height: 400px;
+  margin: 12px 0;
+  border: 1px solid var(--border, #d9e0e7);
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 0;
+}
+
+/* COORDINATES */
+
+.spot-coordinate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+
+.spot-coordinate-grid label {
+  min-width: 0;
+}
+
+.spot-coordinate-grid input {
+  width: 100%;
+}
+
+/* ACTION BUTTONS */
+
+.spot-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.spot-editor-actions button {
+  min-width: 160px;
+}
+
+/* MOBILE */
+
+@media (max-width: 600px) {
+  .spot-editor-shell {
+    padding: 0;
+  }
+
+  .waiting-spot-map {
+    height: 320px;
+  }
+
+  .spot-coordinate-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .spot-editor-actions {
+    flex-direction: column;
+  }
+
+  .spot-editor-actions button {
+    width: 100%;
+  }
+}

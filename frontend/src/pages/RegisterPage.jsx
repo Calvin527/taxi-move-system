@@ -99,7 +99,7 @@ export default function RegisterPage() {
     <div className="auth-page">
       <form className="auth-card" onSubmit={handleSubmit}>
         <h1>Create passenger account</h1>
-        <p>Register to access TaxiLink waiting services.</p>
+        <p>Register to access Taxi Move waiting services.</p>
 
         {error && <div className="error-message">{error}</div>}
 
@@ -178,6 +178,17 @@ export default function RegisterPage() {
         <p>
           Already registered? <Link to="/login">Log in</Link>
         </p>
+        <Link
+          to="/"
+          className="secondary-button"
+          style={{
+            display: "block",
+            textAlign: "center",
+            textDecoration: "none",
+          }}
+        >
+          Exit
+        </Link>
       </form>
     </div>
   );

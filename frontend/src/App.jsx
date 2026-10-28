@@ -1,3 +1,4 @@
+
 import {
   Navigate,
   Route,
@@ -5,24 +6,33 @@ import {
 } from "react-router-dom";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+
 import DashboardPage from "./pages/DashboardPage";
+import DispatchPage from "./pages/DispatchPage";
+import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
 import RoutesPage from "./pages/RoutesPage";
-import DispatchPage from "./pages/DispatchPage";
-
+import AddWaitingSpotPage from "./pages/AddWaitingSpotPage";
 
 export default function App() {
   return (
     <Routes>
       <Route
         path="/"
-        element={<Navigate to="/dashboard" replace />}
+        element={<HomePage />}
       />
 
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      <Route
+        path="/login"
+        element={<LoginPage />}
+      />
+
+      <Route
+        path="/register"
+        element={<RegisterPage />}
+      />
 
       <Route
         path="/dashboard"
@@ -50,6 +60,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/routes"
         element={
@@ -59,12 +70,32 @@ export default function App() {
         }
       />
 
+      {/* CREATE WAITING SPOT */}
+
+      <Route
+        path="/routes/:routeId/waiting-spots/new"
+        element={
+          <ProtectedRoute>
+            <AddWaitingSpotPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* EDIT WAITING SPOT */}
+
+      <Route
+        path="/routes/:routeId/waiting-spots/:spotId/edit"
+        element={
+          <ProtectedRoute>
+            <AddWaitingSpotPage />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="*"
-        element={<Navigate to="/dashboard" replace />}
+        element={<Navigate to="/" replace />}
       />
     </Routes>
-
-      
   );
 }

@@ -49,26 +49,29 @@ export function AuthProvider({ children }) {
 
 
   const login = async (username, password) => {
-    const tokenResponse = await api.post("/accounts/login/", {
-      username,
-      password,
-    });
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
 
-    localStorage.setItem(
-      "access_token",
-      tokenResponse.data.access
-    );
+  const tokenResponse = await api.post("/accounts/login/", {
+    username: username.trim(),
+    password,
+  });
 
-    localStorage.setItem(
-      "refresh_token",
-      tokenResponse.data.refresh
-    );
+  localStorage.setItem(
+    "access_token",
+    tokenResponse.data.access
+  );
 
-    const profileResponse = await api.get("/accounts/me/");
-    setUser(profileResponse.data);
+  localStorage.setItem(
+    "refresh_token",
+    tokenResponse.data.refresh
+  );
 
-    return profileResponse.data;
-  };
+  const profileResponse = await api.get("/accounts/me/");
+  setUser(profileResponse.data);
+
+  return profileResponse.data;
+};
 
 
   const updateProfile = async (formData) => {

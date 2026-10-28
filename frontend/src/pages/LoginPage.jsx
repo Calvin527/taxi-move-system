@@ -1,4 +1,6 @@
+
 import { useState } from "react";
+
 import {
   Link,
   Navigate,
@@ -16,25 +18,45 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const { user, login } = useAuth();
+
   const navigate = useNavigate();
   const location = useLocation();
 
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <Navigate
+        to="/dashboard"
+        replace
+      />
+    );
   }
 
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
     setError("");
     setSubmitting(true);
 
     try {
-      await login(username, password);
+      await login(
+        username.trim(),
+        password
+      );
+
       navigate("/dashboard");
-    } catch {
-      setError("Invalid username or password.");
+    } catch (requestError) {
+      console.error(
+        "Login error:",
+        requestError.response?.data || requestError
+      );
+
+      const backendError =
+        requestError.response?.data?.detail ||
+        "Invalid username or password.";
+
+      setError(backendError);
     } finally {
       setSubmitting(false);
     }
@@ -43,40 +65,88 @@ export default function LoginPage() {
 
   return (
     <div className="auth-page">
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>TaxiLink</h1>
-        <p>Sign in to continue.</p>
+      <form
+        className="auth-card"
+        onSubmit={handleSubmit}
+      >
+        {/* BRANDING */}
+        <div>
+          <h1>
+            TAXI MOVE
+          </h1>
 
+          
+        </div>
+
+        {/* SUCCESS MESSAGE */}
         {location.state?.message && (
           <div className="success-message">
             {location.state.message}
           </div>
         )}
 
-        {error && <div className="error-message">{error}</div>}
+        {/* ERROR MESSAGE */}
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
 
+        {/* USERNAME */}
         <input
           value={username}
-          onChange={(event) => setUsername(event.target.value)}
+          onChange={(event) =>
+            setUsername(event.target.value)
+          }
           placeholder="Username"
+          aria-label="Username"
+          autoComplete="username"
           required
         />
 
+        {/* PASSWORD */}
         <input
           value={password}
-          onChange={(event) => setPassword(event.target.value)}
+          onChange={(event) =>
+            setPassword(event.target.value)
+          }
           placeholder="Password"
+          aria-label="Password"
           type="password"
+          autoComplete="current-password"
           required
         />
 
-        <button disabled={submitting} type="submit">
-          {submitting ? "Signing in..." : "Login"}
+        {/* LOGIN BUTTON */}
+        <button
+          disabled={submitting}
+          type="submit"
+        >
+          {submitting
+            ? "Signing in..."
+            : "Login to TAXI MOVE"}
         </button>
 
+        {/* REGISTER */}
         <p>
-          New passenger? <Link to="/register">Register</Link>
+          New to TAXI MOVE?{" "}
+          <Link to="/register">
+            Create an account
+          </Link>
         </p>
+
+        {/* RETURN HOME */}
+        <Link
+          to="/"
+          className="secondary-button"
+          style={{
+            display: "block",
+            textAlign: "center",
+            textDecoration: "none",
+          }}
+        >
+          Back to Home
+        </Link>
       </form>
     </div>
   );
